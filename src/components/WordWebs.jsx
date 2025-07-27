@@ -1,19 +1,24 @@
 import { useState, useEffect, useRef } from "react";
 // eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from "motion/react";
-import { useDiscordContext } from '../context/DiscordContext';
-import { WordWebsAPI } from '../services/wordWebsApi';
+import { useDiscordContext } from "../context/DiscordContext";
+import { WordWebsAPI } from "../services/wordWebsApi";
 
 const WordWebs = () => {
-  const { user, auth, isLoading: discordLoading, error: discordError } = useDiscordContext();
-  
+  const {
+    user,
+    auth,
+    isLoading: discordLoading,
+    error: discordError,
+  } = useDiscordContext();
+
   // Create API instance once
   const apiRef = useRef(null);
   if (!apiRef.current) {
     try {
       apiRef.current = new WordWebsAPI();
-    } catch (error) {
-      console.error('Failed to create WordWebsAPI instance:', error);
+    } catch {
+      // API client initialization failed
     }
   }
 
@@ -33,61 +38,58 @@ const WordWebs = () => {
   const [attempts, setAttempts] = useState(4);
   const [gameStatus, setGameStatus] = useState("");
   const [isGameOver, setIsGameOver] = useState(false);
-  
+
   // Game session tracking
   const [allGuesses, setAllGuesses] = useState([]);
   const [gameStartTime] = useState(Date.now());
-  
+
   // Ref to prevent duplicate API calls in development
   const hasLoadedPuzzle = useRef(false);
 
   // Load puzzle after Discord authentication is complete
   useEffect(() => {
     if (hasLoadedPuzzle.current) {
-      console.log('WordWebs: Puzzle already loaded, skipping duplicate call');
       return;
     }
 
     // Wait for Discord authentication to complete
+    if (discordLoading) {
+      return;
+    }
+
+    if (discordError) {
+      setGameStatus("Discord authentication failed");
+      setPuzzleLoading(false);
+      return;
+    }
+
     if (!user || !auth) {
-      console.log('WordWebs: Waiting for Discord authentication...');
+      setGameStatus("Authentication required");
+      setPuzzleLoading(false);
       return;
     }
 
     const loadPuzzle = async () => {
       try {
-        console.log('WordWebs: Discord auth complete, loading daily puzzle');
         hasLoadedPuzzle.current = true;
         setPuzzleLoading(true);
-        
-        console.log('WordWebs: Using API client');
+
         if (!apiRef.current) {
-          throw new Error('API client not available');
+          throw new Error("API client not available");
         }
-        
-        console.log('WordWebs: Fetching daily puzzle');
+
         const puzzle = await apiRef.current.getDailyPuzzle();
-        
-        console.log('WordWebs: Puzzle received', puzzle);
         setCurrentPuzzle(puzzle);
         setShuffledWords([...puzzle.words].sort(() => Math.random() - 0.5));
-        
-        console.log('WordWebs: Game ready');
-      } catch (err) {
-        console.error('WordWebs: Failed to load puzzle:', err);
-        setGameStatus('Failed to load daily puzzle');
+      } catch {
+        setGameStatus("Failed to load daily puzzle");
       } finally {
         setPuzzleLoading(false);
       }
     };
 
     loadPuzzle();
-    
-    // Cleanup function
-    return () => {
-      console.log('WordWebs: Component cleanup');
-    };
-  }, [user, auth]); // Depend on user and auth state
+  }, [user, auth, discordLoading, discordError]);
 
   const handleWordClick = (word) => {
     if (
@@ -109,25 +111,23 @@ const WordWebs = () => {
   const handleSubmit = async () => {
     if (selectedWords.length !== 4 || !currentPuzzle) return;
 
-    console.log('WordWebs: Validating guess', selectedWords);
-    
     // Track the guess
     const guess = {
       words: [...selectedWords],
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
     const newAllGuesses = [...allGuesses, guess];
     setAllGuesses(newAllGuesses);
 
     // Check if selected words form a group locally
-    const matchingGroup = currentPuzzle.groups?.find(group => 
-      selectedWords.every(word => group.words.includes(word)) &&
-      group.words.every(word => selectedWords.includes(word))
+    const matchingGroup = currentPuzzle.groups?.find(
+      (group) =>
+        selectedWords.every((word) => group.words.includes(word)) &&
+        group.words.every((word) => selectedWords.includes(word))
     );
 
     if (matchingGroup) {
       // Correct group found!
-      console.log('WordWebs: Correct group found', matchingGroup);
       setSolvedGroups([...solvedGroups, matchingGroup]);
       setSelectedWords([]);
 
@@ -136,13 +136,16 @@ const WordWebs = () => {
       if (newSolvedCount === currentPuzzle.groups?.length) {
         setGameStatus("🎉 Congratulations! You solved the puzzle!");
         setIsGameOver(true);
-        
+
         // Submit final game session
-        await submitFinalSession(newAllGuesses, true, Date.now() - gameStartTime);
+        await submitFinalSession(
+          newAllGuesses,
+          true,
+          Date.now() - gameStartTime
+        );
       }
     } else {
       // Wrong group
-      console.log('WordWebs: Incorrect guess');
       const newAttempts = attempts - 1;
       setAttempts(newAttempts);
       setSelectedWords([]);
@@ -150,31 +153,35 @@ const WordWebs = () => {
       if (newAttempts === 0) {
         setGameStatus("😞 Game Over! No attempts remaining.");
         setIsGameOver(true);
-        
+
         // Submit final game session
-        await submitFinalSession(newAllGuesses, false, Date.now() - gameStartTime);
+        await submitFinalSession(
+          newAllGuesses,
+          false,
+          Date.now() - gameStartTime
+        );
       }
     }
   };
 
-  const submitFinalSession = async (finalGuesses, completed, completionTime) => {
+  const submitFinalSession = async (
+    finalGuesses,
+    completed,
+    completionTime
+  ) => {
     try {
       if (!apiRef.current) return;
-      
-      console.log('WordWebs: Submitting final game session');
-      
+
       await apiRef.current.submitGuess({
         puzzle_id: currentPuzzle.id,
         guess: [], // Not used for final submission
         is_final: true,
         completed,
         completion_time: Math.round(completionTime / 1000), // Convert to seconds
-        all_guesses: finalGuesses.map(g => g.words)
+        all_guesses: finalGuesses.map((g) => g.words),
       });
-      
-      console.log('WordWebs: Final session submitted successfully');
-    } catch (error) {
-      console.error('WordWebs: Error submitting final session:', error);
+    } catch {
+      // Error submitting final session
     }
   };
 
@@ -224,22 +231,23 @@ const WordWebs = () => {
     return (
       <div className="h-screen flex items-center justify-center p-6">
         <div className="text-center">
-          <div className="text-red-500 text-6xl mb-4">⚠️</div>
-          <h1 className="text-2xl font-bold text-white mb-2">Discord Required</h1>
-          <p className="text-slate-300 mb-4">This app must be launched from within Discord as an Activity.</p>
-          <p className="text-slate-400 text-sm">Join a voice channel and look for WordWebs in the Activities list.</p>
+          <div className="h-12 w-12 bg-red-600 rounded-full mx-auto mb-4 flex items-center justify-center">
+            ❌
+          </div>
+          <p className="text-red-300 mb-2">Discord Authentication Failed</p>
+          <p className="text-slate-400 text-sm">{discordError}</p>
         </div>
       </div>
     );
   }
 
   // Show loading state for Discord auth or puzzle loading
-  if (discordLoading || puzzleLoading) {
-    let loadingMessage = 'Loading...';
+  if (puzzleLoading) {
+    let loadingMessage = "Loading...";
     if (discordLoading) {
-      loadingMessage = 'Connecting to Discord...';
+      loadingMessage = "Connecting to Discord...";
     } else if (puzzleLoading) {
-      loadingMessage = 'Loading daily puzzle...';
+      loadingMessage = "Loading daily puzzle...";
     }
 
     return (
@@ -252,14 +260,46 @@ const WordWebs = () => {
     );
   }
 
-  // Show auth waiting state
+  // Show Discord loading state
+  if (discordLoading) {
+    return (
+      <div className="h-screen flex items-center justify-center p-6">
+        <div className="text-center">
+          <div className="animate-pulse h-12 w-12 bg-slate-600 rounded-full mx-auto mb-4"></div>
+          <p className="text-slate-300">Connecting to Discord...</p>
+          <p className="text-slate-400 text-sm mt-2">
+            Please authorize the app when prompted
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show auth error state
+  if (discordError) {
+    return (
+      <div className="h-screen flex items-center justify-center p-6">
+        <div className="text-center">
+          <div className="h-12 w-12 bg-red-600 rounded-full mx-auto mb-4 flex items-center justify-center">
+            ❌
+          </div>
+          <p className="text-red-300 mb-2">Discord Authentication Failed</p>
+          <p className="text-slate-400 text-sm">{discordError}</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show auth waiting state if no user yet
   if (!user || !auth) {
     return (
       <div className="h-screen flex items-center justify-center p-6">
         <div className="text-center">
           <div className="animate-pulse h-12 w-12 bg-slate-600 rounded-full mx-auto mb-4"></div>
           <p className="text-slate-300">Waiting for Discord authorization...</p>
-          <p className="text-slate-400 text-sm mt-2">Please authorize the app when prompted</p>
+          <p className="text-slate-400 text-sm mt-2">
+            Please check for Discord authorization prompt
+          </p>
         </div>
       </div>
     );
@@ -275,9 +315,7 @@ const WordWebs = () => {
             Find four groups of four related words!
           </p>
           {user && (
-            <p className="text-slate-400 text-sm">
-              Playing as {user.username}
-            </p>
+            <p className="text-slate-400 text-sm">Playing as {user.username}</p>
           )}
         </div>
 
@@ -298,33 +336,33 @@ const WordWebs = () => {
               {solvedGroups
                 .sort((a, b) => a.difficulty - b.difficulty)
                 .map((group) => (
-                <motion.div
-                  key={group.category}
-                  layout
-                  initial={{ opacity: 0, scaleY: 0 }}
-                  animate={{ opacity: 1, scaleY: 1 }}
-                  exit={{ opacity: 0, scaleY: 0 }}
-                  transition={{ 
-                    duration: 0.3,
-                    ease: "easeInOut"
-                  }}
-                  style={{ transformOrigin: "top" }}
-                  className="mb-3"
-                >
-                  <div
-                    className={`${getSolvedGroupColor(
-                      group.difficulty
-                    )} rounded-lg p-3 text-white text-center border-2`}
+                  <motion.div
+                    key={group.category}
+                    layout
+                    initial={{ opacity: 0, scaleY: 0 }}
+                    animate={{ opacity: 1, scaleY: 1 }}
+                    exit={{ opacity: 0, scaleY: 0 }}
+                    transition={{
+                      duration: 0.3,
+                      ease: "easeInOut",
+                    }}
+                    style={{ transformOrigin: "top" }}
+                    className="mb-3"
                   >
-                    <div className="font-semibold text-sm mb-1">
-                      {group.category}
+                    <div
+                      className={`${getSolvedGroupColor(
+                        group.difficulty
+                      )} rounded-lg p-3 text-white text-center border-2`}
+                    >
+                      <div className="font-semibold text-sm mb-1">
+                        {group.category}
+                      </div>
+                      <div className="text-xs opacity-90">
+                        {group.words.join(" • ")}
+                      </div>
                     </div>
-                    <div className="text-xs opacity-90">
-                      {group.words.join(" • ")}
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
+                  </motion.div>
+                ))}
             </AnimatePresence>
           </motion.div>
 
@@ -350,7 +388,7 @@ const WordWebs = () => {
                   disabled={isGameOver}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  style={{ position: 'relative' }}
+                  style={{ position: "relative" }}
                 >
                   {word}
                 </motion.button>
