@@ -5,7 +5,7 @@ import { useDiscordContext } from '../context/DiscordContext';
 import { WordWebsAPI } from '../services/wordWebsApi';
 
 const WordWebs = () => {
-  const { user, auth } = useDiscordContext();
+  const { user, auth, isLoading: discordLoading, error: discordError } = useDiscordContext();
   
   // Create API instance once
   const apiRef = useRef(null);
@@ -41,15 +41,22 @@ const WordWebs = () => {
   // Ref to prevent duplicate API calls in development
   const hasLoadedPuzzle = useRef(false);
 
-  // Load puzzle on component mount
+  // Load puzzle after Discord authentication is complete
   useEffect(() => {
     if (hasLoadedPuzzle.current) {
       console.log('WordWebs: Puzzle already loaded, skipping duplicate call');
       return;
     }
+
+    // Wait for Discord authentication to complete
+    if (!user || !auth) {
+      console.log('WordWebs: Waiting for Discord authentication...');
+      return;
+    }
+
     const loadPuzzle = async () => {
       try {
-        console.log('WordWebs: Starting to load daily puzzle');
+        console.log('WordWebs: Discord auth complete, loading daily puzzle');
         hasLoadedPuzzle.current = true;
         setPuzzleLoading(true);
         
@@ -80,7 +87,7 @@ const WordWebs = () => {
     return () => {
       console.log('WordWebs: Component cleanup');
     };
-  }, []);
+  }, [user, auth]); // Depend on user and auth state
 
   const handleWordClick = (word) => {
     if (
@@ -212,13 +219,47 @@ const WordWebs = () => {
     return colors[difficulty] || "bg-gray-600 border-gray-500";
   };
 
-  // Show loading state only for puzzle
-  if (puzzleLoading) {
+  // Show Discord error state
+  if (discordError) {
+    return (
+      <div className="h-screen flex items-center justify-center p-6">
+        <div className="text-center">
+          <div className="text-red-500 text-6xl mb-4">⚠️</div>
+          <h1 className="text-2xl font-bold text-white mb-2">Discord Required</h1>
+          <p className="text-slate-300 mb-4">This app must be launched from within Discord as an Activity.</p>
+          <p className="text-slate-400 text-sm">Join a voice channel and look for WordWebs in the Activities list.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show loading state for Discord auth or puzzle loading
+  if (discordLoading || puzzleLoading) {
+    let loadingMessage = 'Loading...';
+    if (discordLoading) {
+      loadingMessage = 'Connecting to Discord...';
+    } else if (puzzleLoading) {
+      loadingMessage = 'Loading daily puzzle...';
+    }
+
     return (
       <div className="h-screen flex items-center justify-center p-6">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-          <p className="text-slate-300">Loading daily puzzle...</p>
+          <p className="text-slate-300">{loadingMessage}</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show auth waiting state
+  if (!user || !auth) {
+    return (
+      <div className="h-screen flex items-center justify-center p-6">
+        <div className="text-center">
+          <div className="animate-pulse h-12 w-12 bg-slate-600 rounded-full mx-auto mb-4"></div>
+          <p className="text-slate-300">Waiting for Discord authorization...</p>
+          <p className="text-slate-400 text-sm mt-2">Please authorize the app when prompted</p>
         </div>
       </div>
     );

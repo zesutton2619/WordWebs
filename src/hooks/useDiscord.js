@@ -14,12 +14,8 @@ export const useDiscord = () => {
       const isInDiscord = window.parent !== window || new URLSearchParams(window.location.search).has('frame_id');
       
       if (!isInDiscord) {
-        console.log('Running outside Discord - using development mode');
-        setUser({
-          id: 'dev_user',
-          username: 'DevUser',
-          avatar: null,
-        });
+        console.log('Running outside Discord - Discord authentication required');
+        setError('This app must be run within Discord');
         setIsLoading(false);
         return;
       }
@@ -79,13 +75,6 @@ export const useDiscord = () => {
         console.error('Discord SDK initialization failed:', err);
         setError(err.message);
         setIsLoading(false);
-        
-        // Fallback to development user
-        setUser({
-          id: 'dev_user',
-          username: 'DevUser',
-          avatar: null,
-        });
       }
     };
 
