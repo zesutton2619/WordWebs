@@ -3,11 +3,13 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { useDiscordContext } from "../context/DiscordContext";
 import { WordWebsAPI } from "../services/wordWebsApi";
+import { generateGameStateImage } from "../utils/gameStateImage";
 
 const WordWebs = () => {
   const {
     user,
     auth,
+    discordSdk,
     isLoading: discordLoading,
     error: discordError,
   } = useDiscordContext();
@@ -39,14 +41,14 @@ const WordWebs = () => {
   const [gameStatus, setGameStatus] = useState("");
   const [isGameOver, setIsGameOver] = useState(false);
 
-  // Game session tracking
-  const [allGuesses, setAllGuesses] = useState([]);
+  // Game session tracking (now from backend)
   const [gameStartTime] = useState(Date.now());
+  const [allGuesses, setAllGuesses] = useState([]);
 
   // Ref to prevent duplicate API calls in development
   const hasLoadedPuzzle = useRef(false);
 
-  // Load puzzle after Discord authentication is complete
+  // Load puzzle and game state after Discord authentication is complete
   useEffect(() => {
     if (hasLoadedPuzzle.current) {
       return;
@@ -69,7 +71,7 @@ const WordWebs = () => {
       return;
     }
 
-    const loadPuzzle = async () => {
+    const loadPuzzleAndGameState = async () => {
       try {
         hasLoadedPuzzle.current = true;
         setPuzzleLoading(true);
@@ -78,17 +80,48 @@ const WordWebs = () => {
           throw new Error("API client not available");
         }
 
+        // Load puzzle first
         const puzzle = await apiRef.current.getDailyPuzzle();
         setCurrentPuzzle(puzzle);
         setShuffledWords([...puzzle.words].sort(() => Math.random() - 0.5));
-      } catch {
-        setGameStatus("Failed to load daily puzzle");
+
+        // Load existing game state
+        const gameState = await apiRef.current.getGameState();
+
+        if (gameState.game_status === "completed") {
+          setGameStatus("🎉 You have already completed today's puzzle!");
+          setSolvedGroups(gameState.solved_groups || []);
+          setAttempts(gameState.attempts_remaining || 0);
+          setIsGameOver(true);
+        } else if (gameState.game_status === "failed") {
+          setGameStatus("😞 You already used all attempts for today's puzzle.");
+          setSolvedGroups(gameState.solved_groups || []);
+          setAttempts(0);
+          setIsGameOver(true);
+        } else if (gameState.game_status === "in_progress") {
+          // Restore existing progress
+          setSolvedGroups(gameState.solved_groups || []);
+          setSelectedWords(gameState.selected_words || []);
+          setAttempts(gameState.attempts_remaining || 4);
+          setGameStatus("");
+        } else {
+          // New game
+          setGameStatus("");
+        }
+      } catch (error) {
+        console.error("Error loading puzzle/game state:", error);
+        if (error.message.includes("already completed")) {
+          setGameStatus("🎉 You have already completed today's puzzle!");
+          setIsGameOver(true);
+        } else {
+          setGameStatus("Failed to load daily puzzle");
+        }
       } finally {
         setPuzzleLoading(false);
       }
     };
 
-    loadPuzzle();
+    loadPuzzleAndGameState();
   }, [user, auth, discordLoading, discordError]);
 
   const handleWordClick = (word) => {
@@ -111,77 +144,134 @@ const WordWebs = () => {
   const handleSubmit = async () => {
     if (selectedWords.length !== 4 || !currentPuzzle) return;
 
-    // Track the guess
-    const guess = {
-      words: [...selectedWords],
-      timestamp: Date.now(),
-    };
-    const newAllGuesses = [...allGuesses, guess];
-    setAllGuesses(newAllGuesses);
-
-    // Check if selected words form a group locally
-    const matchingGroup = currentPuzzle.groups?.find(
-      (group) =>
-        selectedWords.every((word) => group.words.includes(word)) &&
-        group.words.every((word) => selectedWords.includes(word))
-    );
-
-    if (matchingGroup) {
-      // Correct group found!
-      setSolvedGroups([...solvedGroups, matchingGroup]);
-      setSelectedWords([]);
-
-      // Check if all groups solved
-      const newSolvedCount = solvedGroups.length + 1;
-      if (newSolvedCount === currentPuzzle.groups?.length) {
-        setGameStatus("🎉 Congratulations! You solved the puzzle!");
-        setIsGameOver(true);
-
-        // Submit final game session
-        await submitFinalSession(
-          newAllGuesses,
-          true,
-          Date.now() - gameStartTime
-        );
-      }
-    } else {
-      // Wrong group
-      const newAttempts = attempts - 1;
-      setAttempts(newAttempts);
-      setSelectedWords([]);
-
-      if (newAttempts === 0) {
-        setGameStatus("😞 Game Over! No attempts remaining.");
-        setIsGameOver(true);
-
-        // Submit final game session
-        await submitFinalSession(
-          newAllGuesses,
-          false,
-          Date.now() - gameStartTime
-        );
-      }
-    }
-  };
-
-  const submitFinalSession = async (
-    finalGuesses,
-    completed,
-    completionTime
-  ) => {
     try {
-      if (!apiRef.current) return;
+      // Check if selected words form a group locally
+      const matchingGroup = currentPuzzle.groups?.find(
+        (group) =>
+          selectedWords.every((word) => group.words.includes(word)) &&
+          group.words.every((word) => selectedWords.includes(word))
+      );
 
-      await apiRef.current.submitGuess({
+      let newSolvedGroups = [...solvedGroups];
+      let newAttempts = attempts;
+      let completionTime = null;
+
+      if (matchingGroup) {
+        // Correct group found!
+        newSolvedGroups = [...solvedGroups, matchingGroup];
+        setSolvedGroups(newSolvedGroups);
+
+        // Check if all groups solved
+        if (newSolvedGroups.length === currentPuzzle.groups?.length) {
+          setGameStatus("🎉 Congratulations! You solved the puzzle!");
+          setIsGameOver(true);
+          completionTime = Math.round((Date.now() - gameStartTime) / 1000);
+        }
+      } else {
+        // Wrong group
+        newAttempts = attempts - 1;
+        setAttempts(newAttempts);
+
+        if (newAttempts === 0) {
+          setGameStatus("😞 Game Over! No attempts remaining.");
+          setIsGameOver(true);
+        }
+      }
+
+      // Track this guess
+      const newGuess = {
+        words: [...selectedWords],
+        isCorrect: !!matchingGroup,
+        timestamp: Date.now(),
+      };
+      const updatedGuesses = [...allGuesses, newGuess];
+      setAllGuesses(updatedGuesses);
+
+      // Always clear selected words after guess
+      setSelectedWords([]);
+
+      // Get Discord channel ID and guild ID for messaging
+      let channelId = null;
+      let guildId = null;
+      let imageData = null;
+
+      // Check if Discord messaging should happen for significant events
+      const shouldSendDiscordMessage =
+        newSolvedGroups.length === currentPuzzle.groups?.length || // Game completed
+        newAttempts === 0 || // Game failed
+        matchingGroup || // Found a group
+        (!matchingGroup && newAttempts < attempts); // Failed attempt (wrong guess)
+
+      if (shouldSendDiscordMessage && discordSdk && user) {
+        try {
+          // Get channel ID and guild ID
+          try {
+            const channelInfo = await discordSdk.commands.getChannel();
+            channelId = channelInfo?.id || channelInfo?.channel_id;
+            guildId = channelInfo?.guild_id;
+          } catch {
+            // Try alternative methods to get channel and guild ID
+            try {
+              const urlParams = new URLSearchParams(window.location.search);
+              const channelIdFromUrl = urlParams.get("channel_id");
+              const guildIdFromUrl = urlParams.get("guild_id");
+
+              if (channelIdFromUrl) {
+                channelId = channelIdFromUrl;
+                guildId = guildIdFromUrl;
+              } else {
+                const instanceId =
+                  await discordSdk.commands.getInstanceConnectParams();
+                channelId = instanceId?.channel_id;
+                guildId = instanceId?.guild_id;
+              }
+            } catch (altError) {
+              console.error("Failed to get channel/guild ID:", altError);
+            }
+          }
+
+          // Generate game state image
+          if (channelId) {
+            const puzzleNumber = extractPuzzleNumber(
+              currentPuzzle.date || new Date().toISOString().split("T")[0]
+            );
+            // Use display name for image generation
+            const userForImage = {
+              ...user,
+              username: user.display_name || user.username,
+            };
+            imageData = await generateGameStateImage(
+              updatedGuesses,
+              newSolvedGroups,
+              userForImage,
+              puzzleNumber,
+              newAttempts
+            );
+          }
+        } catch (error) {
+          console.error("Error preparing Discord messaging data:", error);
+        }
+      }
+
+      // Save progress to backend (backend handles Discord messaging automatically)
+      await apiRef.current.saveGameProgress({
         puzzle_id: currentPuzzle.id,
-        guess: [], // Not used for final submission
-        is_final: true,
-        completed,
-        completion_time: Math.round(completionTime / 1000), // Convert to seconds
-        all_guesses: finalGuesses.map((g) => g.words),
+        guess: [...selectedWords],
+        attempts_remaining: newAttempts,
+        solved_groups: newSolvedGroups,
+        selected_words: [],
+        completion_time: completionTime,
+        // Discord messaging data - backend will use these if present
+        channel_id: channelId,
+        guild_id: guildId,
+        image_data: imageData,
+        puzzle_number: extractPuzzleNumber(
+          currentPuzzle.date || new Date().toISOString().split("T")[0]
+        ),
       });
-    } catch {
-      // Error submitting final session
+    } catch (error) {
+      console.error("Error submitting guess:", error);
+      setGameStatus("Error saving progress. Please try again.");
     }
   };
 
@@ -219,8 +309,8 @@ const WordWebs = () => {
   const getSolvedGroupColor = (difficulty) => {
     const colors = {
       1: "bg-green-600 border-green-500",
-      2: "bg-blue-600 border-blue-500",
-      3: "bg-purple-600 border-purple-500",
+      2: "bg-yellow-600 border-yellow-500",
+      3: "bg-orange-600 border-orange-500",
       4: "bg-red-600 border-red-500",
     };
     return colors[difficulty] || "bg-gray-600 border-gray-500";
@@ -310,19 +400,21 @@ const WordWebs = () => {
       <div className="max-w-md w-full relative overflow-hidden">
         {/* Header */}
         <div className="text-center mb-4">
-          <h1 className="text-4xl font-bold mb-2">🕸️ WordWebs</h1>
+          <h1 className="text-4xl font-bold mb-2">🕸️ Word Webs</h1>
           <p className="text-slate-300 mb-2">
             Find four groups of four related words!
           </p>
           {user && (
-            <p className="text-slate-400 text-sm">Playing as {user.username}</p>
+            <p className="text-slate-400 text-sm">
+              Playing as {user.display_name || user.username}
+            </p>
           )}
         </div>
 
         {/* Game Status */}
         {gameStatus && (
           <div className="text-center mb-6">
-            <div className="bg-slate-800 border border-slate-700 rounded-lg p-3">
+            <div className="bg-slate-800 border border-slate-700 rounded-lg p-2">
               {gameStatus}
             </div>
           </div>
@@ -331,46 +423,48 @@ const WordWebs = () => {
         {/* Game Area - Compact Container */}
         <div>
           {/* Solved Groups Display - Horizontal Rows */}
-          <motion.div layout className="space-y-3">
-            <AnimatePresence>
-              {solvedGroups
-                .sort((a, b) => a.difficulty - b.difficulty)
-                .map((group) => (
-                  <motion.div
-                    key={group.category}
-                    layout
-                    initial={{ opacity: 0, scaleY: 0 }}
-                    animate={{ opacity: 1, scaleY: 1 }}
-                    exit={{ opacity: 0, scaleY: 0 }}
-                    transition={{
-                      duration: 0.3,
-                      ease: "easeInOut",
-                    }}
-                    style={{ transformOrigin: "top" }}
-                    className="mb-3"
-                  >
-                    <div
-                      className={`${getSolvedGroupColor(
-                        group.difficulty
-                      )} rounded-lg p-3 text-white text-center border-2`}
+          <div className="grid grid-cols-4 gap-3 p-2">
+            <motion.div layout className="space-y-2 col-span-4">
+              <AnimatePresence>
+                {solvedGroups
+                  .sort((a, b) => a.difficulty - b.difficulty)
+                  .map((group) => (
+                    <motion.div
+                      key={group.category}
+                      layout
+                      initial={{ opacity: 0, scaleY: 0 }}
+                      animate={{ opacity: 1, scaleY: 1 }}
+                      exit={{ opacity: 0, scaleY: 0 }}
+                      transition={{
+                        duration: 0.3,
+                        ease: "easeInOut",
+                      }}
+                      style={{ transformOrigin: "top" }}
+                      className=""
                     >
-                      <div className="font-semibold text-sm mb-1">
-                        {group.category}
+                      <div
+                        className={`${getSolvedGroupColor(
+                          group.difficulty
+                        )} rounded-lg p-3 text-white text-center border-2`}
+                      >
+                        <div className="font-semibold text-sm mb-1">
+                          {group.category}
+                        </div>
+                        <div className="text-xs opacity-90">
+                          {group.words.join(" • ")}
+                        </div>
                       </div>
-                      <div className="text-xs opacity-90">
-                        {group.words.join(" • ")}
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-            </AnimatePresence>
-          </motion.div>
+                    </motion.div>
+                  ))}
+              </AnimatePresence>
+            </motion.div>
+          </div>
 
           {/* Remaining Words Grid */}
           <motion.div
             layout
             transition={{ duration: 0.3, ease: "easeInOut" }}
-            className={`grid ${getRemainingGridClass()} gap-3 my-4 relative`}
+            className={`grid ${getRemainingGridClass()} gap-3 mb-4 relative p-2`}
           >
             <AnimatePresence mode="popLayout">
               {remainingWords.map((word) => (
@@ -429,6 +523,15 @@ const WordWebs = () => {
       </div>
     </div>
   );
+};
+
+// Helper function to extract puzzle number from date
+const extractPuzzleNumber = (dateString) => {
+  const launchDate = new Date("2025-07-30");
+  const puzzleDate = new Date(dateString);
+  const diffTime = puzzleDate - launchDate;
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return Math.max(1, diffDays);
 };
 
 export default WordWebs;

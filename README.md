@@ -5,10 +5,12 @@ A Discord Activity featuring NYT Connections-style word puzzles. Players find fo
 ## Features
 
 - **Discord Activity Integration**: Runs natively within Discord using the Embedded App SDK
-- **Daily Puzzles**: New NYT Connections-style puzzles generated daily
+- **Daily Puzzles**: New NYT Connections-style puzzles generated daily at midnight EST
 - **Discord Authentication**: Seamless OAuth flow with Discord SDK
 - **Real-time Gameplay**: Interactive word selection and group validation
 - **Leaderboards**: Track daily progress and compare with other players
+- **Automatic Daily Summaries**: Wordle-style daily results posted to Discord channels
+- **Visual Game State**: Canvas-based images showing game attempts and results
 
 ## Technology Stack
 
@@ -81,6 +83,10 @@ npm run lint
 - **DiscordProvider.jsx** - Discord SDK context provider
 - **useDiscord.js** - Custom hook for Discord authentication and SDK interactions
 
+### Utility Components
+
+- **gameStateImage.js** - Canvas-based image generation for game state visualization
+
 ### Discord Integration
 
 - **OAuth Flow**: Automatic Discord authentication using embedded app SDK
@@ -99,7 +105,7 @@ The frontend communicates with a serverless Lambda API:
 
 - **16 words** arranged in a 4x4 grid
 - **4 groups** of 4 related words each
-- **Difficulty levels** 1-4 (color-coded: yellow, green, blue, purple)
+- **Difficulty levels** 1-4 (color-coded: green, yellow, orange, red)
 - **4 attempts** to solve all groups
 - **Progressive revelation** of solved groups
 

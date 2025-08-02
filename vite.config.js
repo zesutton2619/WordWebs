@@ -16,6 +16,6 @@ export default defineConfig({
   },
   server: {
     open: true,
-    allowedHosts: [""], // Use this for local https tunneling for testing
+    // allowedHosts: [""], // Use this for local https tunneling for testing
   },
 });

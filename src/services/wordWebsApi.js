@@ -2,9 +2,9 @@ export class WordWebsAPI {
   constructor(accessToken = null) {
     this.baseURL = import.meta.env.VITE_API_BASE_URL;
     this.accessToken = accessToken;
-    
+
     if (!this.baseURL) {
-      throw new Error('VITE_API_BASE_URL environment variable is required');
+      throw new Error("VITE_API_BASE_URL environment variable is required");
     }
   }
 
@@ -14,103 +14,126 @@ export class WordWebsAPI {
 
   getAuthHeaders() {
     const headers = {
-      'Content-Type': 'application/json'
+      "Content-Type": "application/json",
     };
-    
+
     if (this.accessToken) {
-      headers['Authorization'] = `Bearer ${this.accessToken}`;
+      headers["Authorization"] = `Bearer ${this.accessToken}`;
     }
-    
+
     return headers;
   }
 
   async getDailyPuzzle() {
     try {
-      console.log('WordWebsAPI: Fetching daily puzzle');
-      const response = await fetch(`${this.baseURL}/daily-puzzle`);
-      
+      const headers = this.getAuthHeaders();
+
+      const response = await fetch(`${this.baseURL}/daily-puzzle`, {
+        headers: headers,
+      });
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const puzzle = await response.json();
-      console.log('WordWebsAPI: Daily puzzle received', puzzle);
-      
       return puzzle;
     } catch (error) {
-      console.error('WordWebsAPI: Error fetching daily puzzle:', error);
-      throw new Error('Failed to load daily puzzle');
+      console.error("WordWebsAPI: Error fetching daily puzzle:", error);
+      throw new Error("Failed to load daily puzzle");
     }
   }
 
-  async submitGuess(guessData) {
-    try {
-      console.log('WordWebsAPI: Submitting guess', guessData);
-      const response = await fetch(`${this.baseURL}/submit-guess`, {
-        method: 'POST',
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify(guessData)
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const result = await response.json();
-      console.log('WordWebsAPI: Guess result received', result);
-      
-      return result;
-    } catch (error) {
-      console.error('WordWebsAPI: Error submitting guess:', error);
-      throw new Error('Failed to submit guess');
-    }
-  }
 
   async getLeaderboard(date = null) {
     try {
-      const url = date 
+      const url = date
         ? `${this.baseURL}/leaderboard?date=${date}`
         : `${this.baseURL}/leaderboard`;
-      
-      console.log('WordWebsAPI: Fetching leaderboard', { date });
-      const response = await fetch(url);
-      
+
+      console.log("WordWebsAPI: Fetching leaderboard", { date });
+      const response = await fetch(url, {
+        headers: this.getAuthHeaders(),
+      });
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const leaderboard = await response.json();
-      console.log('WordWebsAPI: Leaderboard received', leaderboard);
-      
+      console.log("WordWebsAPI: Leaderboard received", leaderboard);
+
       return leaderboard;
     } catch (error) {
-      console.error('WordWebsAPI: Error fetching leaderboard:', error);
-      throw new Error('Failed to load leaderboard');
+      console.error("WordWebsAPI: Error fetching leaderboard:", error);
+      throw new Error("Failed to load leaderboard");
     }
   }
 
   async getPlayerStats(discordId) {
     try {
-      console.log('WordWebsAPI: Fetching player stats for', discordId);
-      const url = discordId 
+      console.log("WordWebsAPI: Fetching player stats for", discordId);
+      const url = discordId
         ? `${this.baseURL}/player-stats?discord_id=${discordId}`
         : `${this.baseURL}/player-stats`;
-      
+
       const response = await fetch(url, {
-        headers: this.getAuthHeaders()
+        headers: this.getAuthHeaders(),
       });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const stats = await response.json();
-      console.log('WordWebsAPI: Player stats received', stats);
-      
+      console.log("WordWebsAPI: Player stats received", stats);
+
       return stats;
     } catch (error) {
-      console.error('WordWebsAPI: Error fetching player stats:', error);
-      throw new Error('Failed to load player stats');
+      console.error("WordWebsAPI: Error fetching player stats:", error);
+      throw new Error("Failed to load player stats");
+    }
+  }
+
+  async getGameState(date = null) {
+    try {
+      const url = date
+        ? `${this.baseURL}/game-state?date=${date}`
+        : `${this.baseURL}/game-state`;
+
+      const response = await fetch(url, {
+        headers: this.getAuthHeaders(),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const gameState = await response.json();
+      return gameState;
+    } catch (error) {
+      console.error("WordWebsAPI: Error fetching game state:", error);
+      throw new Error("Failed to load game state");
+    }
+  }
+
+  async saveGameProgress(progressData) {
+    try {
+      const response = await fetch(`${this.baseURL}/save-progress`, {
+        method: "POST",
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify(progressData),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error("WordWebsAPI: Error saving progress:", error);
+      throw new Error("Failed to save game progress");
     }
   }
 }
