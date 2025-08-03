@@ -70,30 +70,6 @@ export class WordWebsAPI {
     }
   }
 
-  async getPlayerStats(discordId) {
-    try {
-      console.log("WordWebsAPI: Fetching player stats for", discordId);
-      const url = discordId
-        ? `${this.baseURL}/player-stats?discord_id=${discordId}`
-        : `${this.baseURL}/player-stats`;
-
-      const response = await fetch(url, {
-        headers: this.getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const stats = await response.json();
-      console.log("WordWebsAPI: Player stats received", stats);
-
-      return stats;
-    } catch (error) {
-      console.error("WordWebsAPI: Error fetching player stats:", error);
-      throw new Error("Failed to load player stats");
-    }
-  }
 
   async getGameState(date = null) {
     try {

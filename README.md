@@ -145,5 +145,3 @@ The frontend communicates with a serverless Lambda API:
 
 - Use Discord's test client for easier debugging
 - Check browser console for Discord SDK messages
-- Verify tunnel URLs are accessible externally
-- Test OAuth flow in incognito mode

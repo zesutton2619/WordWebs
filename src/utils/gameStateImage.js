@@ -12,8 +12,8 @@ export function generateGameStateImage(
     const ctx = canvas.getContext("2d");
 
     // Set canvas size
-    canvas.width = 500;
-    canvas.height = 400;
+    canvas.width = 250;
+    canvas.height = 200;
 
     // Background
     ctx.fillStyle = "#0f172a"; // Dark slate background like your game
@@ -51,22 +51,22 @@ export function generateGameStateImage(
 
     // Add title text
     ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 28px Arial";
+    ctx.font = "bold 14px Arial";
     ctx.textAlign = "center";
-    ctx.fillText(`Word Webs #${puzzleNumber}`, canvas.width / 2, 50);
+    ctx.fillText(`Word Webs #${puzzleNumber}`, canvas.width / 2, 25);
 
     // Add player name
-    ctx.font = "18px Arial";
+    ctx.font = "9px Arial";
     ctx.fillStyle = "#cbd5e1";
-    ctx.fillText(playerInfo.username || "Player", canvas.width / 2, 80);
+    ctx.fillText(playerInfo.username || "Player", canvas.width / 2, 40);
 
-    let currentY = 110;
-    const rowHeight = 45;
-    const rowPadding = 8;
+    let currentY = 55;
+    const rowHeight = 22;
+    const rowPadding = 4;
 
     // Calculate consistent width based on 4 words grid
-    const gridSize = 40;
-    const gridPadding = 6;
+    const gridSize = 20;
+    const gridPadding = 3;
     const wordsPerRow = 4;
     const gridWidth = wordsPerRow * gridSize + (wordsPerRow - 1) * gridPadding;
     const gridStartX = (canvas.width - gridWidth) / 2;
@@ -79,7 +79,7 @@ export function generateGameStateImage(
     for (let i = 0; i < sortedSolvedGroups.length; i++) {
       // Draw group row background (same width as grid)
       ctx.fillStyle = colors[sortedSolvedGroups[i].difficulty];
-      roundRect(ctx, gridStartX, currentY, gridWidth, rowHeight, 8);
+      roundRect(ctx, gridStartX, currentY, gridWidth, rowHeight, 4);
       ctx.fill();
 
       currentY += rowHeight + rowPadding;
@@ -104,13 +104,13 @@ export function generateGameStateImage(
 
         // Show remaining words as dark gray boxes
         ctx.fillStyle = colors.empty;
-        roundRect(ctx, x, y, gridSize, gridSize, 6);
+        roundRect(ctx, x, y, gridSize, gridSize, 3);
         ctx.fill();
 
         // Add subtle border
         ctx.strokeStyle = "#1e293b";
-        ctx.lineWidth = 1.5;
-        roundRect(ctx, x, y, gridSize, gridSize, 6);
+        ctx.lineWidth = 0.75;
+        roundRect(ctx, x, y, gridSize, gridSize, 3);
         ctx.stroke();
       }
 
@@ -134,8 +134,8 @@ export function generateGameStateImage(
 
     // Add dots for attempts remaining (like the actual game)
     if (solvedGroups.length < 4) {
-      const dotSize = 8;
-      const dotSpacing = 16;
+      const dotSize = 4;
+      const dotSpacing = 8;
       const totalDots = 4;
       const dotsWidth = (totalDots - 1) * dotSpacing + dotSize;
       const dotsStartX = (canvas.width - dotsWidth) / 2;
@@ -165,9 +165,9 @@ export function generateGameStateImage(
 
     // Add completion status text below dots
     ctx.fillStyle = statusColor;
-    ctx.font = "20px Arial";
+    ctx.font = "10px Arial";
     ctx.textAlign = "center";
-    ctx.fillText(statusText, canvas.width / 2, currentY + 60);
+    ctx.fillText(statusText, canvas.width / 2, currentY + 30);
 
     // Convert canvas to data URL
     const dataURL = canvas.toDataURL("image/png");

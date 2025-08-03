@@ -40,6 +40,8 @@ const WordWebs = () => {
   const [attempts, setAttempts] = useState(4);
   const [gameStatus, setGameStatus] = useState("");
   const [isGameOver, setIsGameOver] = useState(false);
+  const [wrongGuessShake, setWrongGuessShake] = useState(false);
+  const [nearMissMessage, setNearMissMessage] = useState("");
 
   // Game session tracking (now from backend)
   const [gameStartTime] = useState(Date.now());
@@ -168,9 +170,31 @@ const WordWebs = () => {
           completionTime = Math.round((Date.now() - gameStartTime) / 1000);
         }
       } else {
-        // Wrong group
+        // Wrong group - check for near miss (3/4 correct)
+        let correctWordsCount = 0;
+
+        for (const group of currentPuzzle.groups) {
+          const matchingWords = selectedWords.filter((word) =>
+            group.words.includes(word)
+          );
+          if (matchingWords.length > correctWordsCount) {
+            correctWordsCount = matchingWords.length;
+          }
+        }
+
+        // Trigger shake animation
+        setWrongGuessShake(true);
+        setTimeout(() => setWrongGuessShake(false), 600);
+
         newAttempts = attempts - 1;
         setAttempts(newAttempts);
+
+        if (correctWordsCount === 3) {
+          setNearMissMessage("One word is off!");
+          setTimeout(() => setNearMissMessage(""), 3000);
+        } else {
+          setNearMissMessage("");
+        }
 
         if (newAttempts === 0) {
           setGameStatus("😞 Game Over! No attempts remaining.");
@@ -420,6 +444,15 @@ const WordWebs = () => {
           </div>
         )}
 
+        {/* Near Miss Message */}
+        {nearMissMessage && (
+          <div className="text-center mb-4">
+            <div className="bg-yellow-800 border border-yellow-600 rounded-lg p-2 text-yellow-200">
+              {nearMissMessage}
+            </div>
+          </div>
+        )}
+
         {/* Game Area - Compact Container */}
         <div>
           {/* Solved Groups Display - Horizontal Rows */}
@@ -473,15 +506,22 @@ const WordWebs = () => {
                   layout="position"
                   initial={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0 }}
-                  transition={{
-                    layout: { duration: 0.3, ease: "easeInOut" },
-                    exit: { duration: 0.1, ease: "easeIn" },
-                  }}
                   onClick={() => handleWordClick(word)}
                   className={getWordButtonClass(word)}
                   disabled={isGameOver}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
+                  animate={{
+                    x:
+                      wrongGuessShake && selectedWords.includes(word)
+                        ? [0, -10, 10, -10, 10, 0]
+                        : 0,
+                  }}
+                  transition={{
+                    layout: { duration: 0.3, ease: "easeInOut" },
+                    exit: { duration: 0.1, ease: "easeIn" },
+                    x: { duration: 0.6, ease: "easeInOut" },
+                  }}
                   style={{ position: "relative" }}
                 >
                   {word}
