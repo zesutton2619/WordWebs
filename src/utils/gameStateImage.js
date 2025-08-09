@@ -167,7 +167,7 @@ export function generateGameStateImage(
     ctx.fillStyle = statusColor;
     ctx.font = "10px Arial";
     ctx.textAlign = "center";
-    ctx.fillText(statusText, canvas.width / 2, currentY + 30);
+    ctx.fillText(statusText, canvas.width / 2, currentY + 35);
 
     // Convert canvas to data URL
     const dataURL = canvas.toDataURL("image/png");

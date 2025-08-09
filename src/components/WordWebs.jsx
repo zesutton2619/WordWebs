@@ -541,7 +541,7 @@ const WordWebs = () => {
           <div className="grid grid-cols-4 gap-3 p-2">
             <motion.div layout className="space-y-2 col-span-4">
               <AnimatePresence>
-                {solvedGroups
+                {(isGameOver ? currentPuzzle?.groups || [] : solvedGroups)
                   .sort((a, b) => a.difficulty - b.difficulty)
                   .map((group) => (
                     <motion.div
@@ -555,7 +555,6 @@ const WordWebs = () => {
                         ease: "easeInOut",
                       }}
                       style={{ transformOrigin: "top" }}
-                      className=""
                     >
                       <div
                         className={`${getSolvedGroupColor(
