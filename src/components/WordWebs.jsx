@@ -575,46 +575,48 @@ const WordWebs = () => {
           </div>
 
           {/* Remaining Words Grid */}
-          <motion.div
-            layout
-            transition={{ duration: 0.3, ease: "easeInOut" }}
-            className={`grid ${getRemainingGridClass()} gap-3 mb-4 relative p-2`}
-          >
-            <AnimatePresence mode="popLayout">
-              {remainingWords.map((word) => (
-                <motion.button
-                  key={word}
-                  layout="position"
-                  initial={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0 }}
-                  onClick={() => handleWordClick(word)}
-                  className={getWordButtonClass(word)}
-                  disabled={isGameOver}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  animate={{
-                    x:
-                      wrongGuessShake && selectedWords.includes(word)
-                        ? [0, -12, 12, -12, 12, -8, 8, -4, 4, 0]
-                        : 0,
-                    rotate:
-                      wrongGuessShake && selectedWords.includes(word)
-                        ? [0, -2, 2, -2, 2, -1, 1, 0]
-                        : 0,
-                  }}
-                  transition={{
-                    layout: { duration: 0.3, ease: "easeInOut" },
-                    exit: { duration: 0.1, ease: "easeIn" },
-                    x: { duration: 0.8, ease: "easeInOut" },
-                    rotate: { duration: 0.8, ease: "easeInOut" },
-                  }}
-                  style={{ position: "relative" }}
-                >
-                  {word}
-                </motion.button>
-              ))}
-            </AnimatePresence>
-          </motion.div>
+          {!isGameOver && (
+            <motion.div
+              layout
+              transition={{ duration: 0.3, ease: "easeInOut" }}
+              className={`grid ${getRemainingGridClass()} gap-3 mb-4 relative p-2`}
+            >
+              <AnimatePresence mode="popLayout">
+                {remainingWords.map((word) => (
+                  <motion.button
+                    key={word}
+                    layout="position"
+                    initial={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0 }}
+                    onClick={() => handleWordClick(word)}
+                    className={getWordButtonClass(word)}
+                    disabled={isGameOver}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    animate={{
+                      x:
+                        wrongGuessShake && selectedWords.includes(word)
+                          ? [0, -12, 12, -12, 12, -8, 8, -4, 4, 0]
+                          : 0,
+                      rotate:
+                        wrongGuessShake && selectedWords.includes(word)
+                          ? [0, -2, 2, -2, 2, -1, 1, 0]
+                          : 0,
+                    }}
+                    transition={{
+                      layout: { duration: 0.3, ease: "easeInOut" },
+                      exit: { duration: 0.1, ease: "easeIn" },
+                      x: { duration: 0.8, ease: "easeInOut" },
+                      rotate: { duration: 0.8, ease: "easeInOut" },
+                    }}
+                    style={{ position: "relative" }}
+                  >
+                    {word}
+                  </motion.button>
+                ))}
+              </AnimatePresence>
+            </motion.div>
+          )}
 
           {/* Attempts as dots */}
           <div className="flex justify-center gap-2 mb-4">
