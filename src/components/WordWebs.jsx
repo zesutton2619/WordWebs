@@ -690,7 +690,7 @@ const WordWebs = () => {
             disabled={selectedWords.length !== 4 || isGameOver}
             className="px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed cursor-pointer text-white font-medium rounded-lg transition-colors"
           >
-            Submit Group
+            Submit
           </button>
         </div>
 
