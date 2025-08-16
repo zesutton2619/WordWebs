@@ -124,7 +124,7 @@ export function generateGameStateImage(
     if (solvedGroups.length === 4) {
       statusText = "🎉 Completed!";
       statusColor = "#22c55e";
-    } else if (guesses.length >= 4 && solvedGroups.length < 4) {
+    } else if (attemptsRemaining === 0 && solvedGroups.length < 4) {
       statusText = "💔 Failed";
       statusColor = "#ef4444";
     } else {

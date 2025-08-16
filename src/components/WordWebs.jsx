@@ -35,6 +35,7 @@ const WordWebs = () => {
   // Puzzle state
   const [currentPuzzle, setCurrentPuzzle] = useState(null);
   const [shuffledWords, setShuffledWords] = useState([]);
+  const [isShuffling, setIsShuffling] = useState(false);
   const [puzzleLoading, setPuzzleLoading] = useState(true);
   const [selectedWords, setSelectedWords] = useState([]);
   const [solvedGroups, setSolvedGroups] = useState([]);
@@ -45,7 +46,6 @@ const WordWebs = () => {
   const [nearMissMessage, setNearMissMessage] = useState("");
   const [attemptLostAnimation, setAttemptLostAnimation] = useState(false);
 
-  // Game session tracking (now from backend)
   const [gameStartTime] = useState(Date.now());
   const [allGuesses, setAllGuesses] = useState([]);
 
@@ -390,8 +390,22 @@ const WordWebs = () => {
     }
   };
 
-  const handleClear = () => {
-    setSelectedWords([]);
+  const handleShuffle = () => {
+    if (isShuffling || isGameOver) return;
+
+    setIsShuffling(true);
+    setSelectedWords([]); // Clear selection when shuffling
+
+    // Create new shuffled array
+    const newShuffledWords = [...shuffledWords].sort(() => Math.random() - 0.5);
+
+    // Delay the shuffle to allow for animation
+    setTimeout(() => {
+      setShuffledWords(newShuffledWords);
+      setTimeout(() => {
+        setIsShuffling(false);
+      }, 300); // Wait for layout animation to complete
+    }, 200);
   };
 
   // Get remaining words that haven't been solved
@@ -410,7 +424,17 @@ const WordWebs = () => {
   };
 
   const getWordButtonClass = (word) => {
-    const baseClass = "w-full h-16 rounded-lg font-medium text-sm border-2";
+    // Dynamic text size based on word length
+    let textSizeClass = "text-sm";
+    if (word.length > 12) {
+      textSizeClass = "text-xs";
+    } else if (word.length > 8) {
+      textSizeClass = "text-sm";
+    } else {
+      textSizeClass = "text-base";
+    }
+
+    const baseClass = `w-full h-16 rounded-lg font-medium ${textSizeClass} border-2 px-1 break-words hyphens-auto overflow-hidden flex items-center justify-center`;
 
     // Check if word is selected
     if (selectedWords.includes(word)) {
@@ -601,13 +625,20 @@ const WordWebs = () => {
                       rotate:
                         wrongGuessShake && selectedWords.includes(word)
                           ? [0, -2, 2, -2, 2, -1, 1, 0]
+                          : isShuffling
+                          ? [0, -5, 5, -3, 3, 0]
                           : 0,
+                      scale: isShuffling ? [1, 0.95, 1.05, 1] : 1,
                     }}
                     transition={{
                       layout: { duration: 0.3, ease: "easeInOut" },
                       exit: { duration: 0.1, ease: "easeIn" },
                       x: { duration: 0.8, ease: "easeInOut" },
-                      rotate: { duration: 0.8, ease: "easeInOut" },
+                      rotate: {
+                        duration: wrongGuessShake ? 0.8 : 0.6,
+                        ease: "easeInOut",
+                      },
+                      scale: { duration: 0.6, ease: "easeInOut" },
                     }}
                     style={{ position: "relative" }}
                   >
@@ -648,11 +679,11 @@ const WordWebs = () => {
         {/* Game Controls */}
         <div className="flex gap-4 justify-center">
           <button
-            onClick={handleClear}
-            disabled={selectedWords.length === 0 || isGameOver}
+            onClick={handleShuffle}
+            disabled={isGameOver || isShuffling}
             className="px-6 py-3 bg-slate-700 hover:bg-slate-600 disabled:bg-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed cursor-pointer text-white font-medium rounded-lg transition-colors"
           >
-            Clear Selection
+            Shuffle
           </button>
           <button
             onClick={handleSubmit}
